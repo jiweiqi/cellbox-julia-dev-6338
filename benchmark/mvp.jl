@@ -20,9 +20,9 @@ alg = Tsit5();
 
 opt = ADAMW(5.f-3, (0.9, 0.999), 1.f-4);
 ns = 100;  # number of nodes / species
-tfinal = 20.0;
+tfinal = 40.0;
 ntotal = 40;  # number of samples for each perturbation
-batch_size = 8;
+batch_size = 40;
 
 function gen_network(m; weight_params=(0., 1.), sparsity=0.)
     w = rand(Normal(weight_params[1], weight_params[2]), (m, m))
@@ -38,7 +38,8 @@ u0 = zeros(ns);
 p_gold = gen_network(ns; weight_params=(0.0, 1.0), sparsity=0.9);
 
 # pay attentions to this one, we can discuss if we need this one (encourage sparcity)
-p_gold = sign.(p_gold) .* clamp.(abs.(p_gold), 0.1, Inf);
+# p_gold = sign.(p_gold) .* clamp.(abs.(p_gold), 0.1, Inf);
+p_gold = clamp.(abs.(p_gold), 0, 1.0);
 
 p = gen_network(ns; weight_params=(0.0, 0.1), sparsity=0);
 
@@ -71,7 +72,7 @@ function loss_neuralode(p, sample=ntotal)
 end
 loss_neuralode(p)
 
-Zygote.gradient(x -> loss_neuralode(x), p)
+# Zygote.gradient(x -> loss_neuralode(x), p)
 # @benchmark Zygote.gradient(x -> loss_neuralode(x), p)
 # @benchmark ForwardDiff.gradient(x -> loss_neuralode(x), p)
 
