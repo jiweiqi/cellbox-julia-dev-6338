@@ -21,7 +21,7 @@ alg = Tsit5();
 # opt = ADAMW(5.f-3, (0.9, 0.999), 1.f-4);
 opt = Flux.Optimiser(ExpDecay(5e-3, 0.2, 300 * n_exp_train, 1e-4),
                      ADAMW(0.005, (0.9, 0.999), 1.f-6));
-ns = 5;  # number of nodes / species
+ns = 100;  # number of nodes / species
 tfinal = 20.0;
 ntotal = 20;  # number of samples for each perturbation
 batch_size = 8;  # STEER
@@ -52,7 +52,7 @@ u0 = zeros(ns);
 p_gold = gen_network(ns; weight_params=(0.0, 1.0), sparsity=0.9);
 p = gen_network(ns; weight_params=(0.0, 0.01), sparsity=0);
 
-show_network(p)
+# show_network(p)
 
 function cellbox!(du, u, p, t)
     du .= tanh.(view(p, :, 2:ns + 1) * u - μ) - view(p, :, 1) .* u
@@ -182,4 +182,4 @@ for i_exp in 1:n_exp
     cbi(p, i_exp)
 end
 
-show_network(p)
+# show_network(p)
