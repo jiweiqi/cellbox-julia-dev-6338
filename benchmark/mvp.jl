@@ -13,7 +13,7 @@ using BSON: @save, @load
 Random.seed!(1234);
 
 # Arguments
-is_restart = true;
+is_restart = false;
 n_epoch = 10000;
 n_plot = 10;  # frequency of callback
 alg = Tsit5();
@@ -25,21 +25,21 @@ ntotal = 40;  # number of samples for each perturbation
 batch_size = 40;
 
 function gen_network(m; weight_params=(0., 1.), sparsity=0.)
-    w = rand(Normal(weight_params[1], weight_params[2]), (m, m))
+    w = rand(Uniform(weight_params[1], weight_params[2]), (m, m))
     p = [sparsity, 1 - sparsity]
     w .*= sample([0, 1], weights(p), (m, m), replace=true)
-    α = abs.(rand(Normal(weight_params[1], weight_params[2]), (m)))
+    α = abs.(rand(Uniform(weight_params[1], weight_params[2]), (m)))
     return hcat(α, w)
 end
 
 Random.seed!(1234);
-u0 = zeros(ns);
-μ = rand(ns);
+u0 = zeros(Float64, ns);
+μ = rand(Float64, ns);
 p_gold = gen_network(ns; weight_params=(0.0, 1.0), sparsity=0.9);
 
 # pay attentions to this one, we can discuss if we need this one (encourage sparcity)
 # p_gold = sign.(p_gold) .* clamp.(abs.(p_gold), 0.1, Inf);
-p_gold = clamp.(abs.(p_gold), 0, 1.0);
+# p_gold = clamp.(abs.(p_gold), 0, 1.0);
 
 p = gen_network(ns; weight_params=(0.0, 0.1), sparsity=0);
 
@@ -57,17 +57,17 @@ sol = solve(prob, alg, u0=u0, p=p_gold);
 ode_data = Array(sol);
 yscale = maximum(ode_data, dims=2);
 
-function predict_neuralode(u0, p, sample=ntotal)
-    _prob = remake(prob, u0=u0, p=p, tspan=[0, ts[sample]])
-    pred = Array(solve(_prob, alg, saveat=ts[1:sample], sensalg=QuadratureAdjoint()))
+function predict_neuralode(u0, p, batch=ntotal)
+    _prob = remake(prob, u0=u0, p=p, tspan=[0, ts[batch]])
+    pred = Array(solve(_prob, alg, saveat=ts[1:batch], sensalg=QuadratureAdjoint()))
     return pred
 end
 predict_neuralode(u0, p);
 using BenchmarkTools
 
-function loss_neuralode(p, sample=ntotal)
-    pred = predict_neuralode(u0, p, sample)
-    loss = mae(ode_data[:, 1:sample], pred)
+function loss_neuralode(p, batch=ntotal)
+    pred = predict_neuralode(u0, p, batch)
+    loss = mae(ode_data[:, 1:batch], pred)
     return loss
 end
 loss_neuralode(p)
@@ -122,16 +122,16 @@ end
 if is_restart
     @load "./checkpoint/mymodel.bson" p opt l_loss_train l_loss_val iter;
     iter += 1;
-    # opt = ADAMW(5.f-4, (0.9, 0.999), 1.f-4);
+    # opt = ADAMW(1.f-4, (0.9, 0.999), 1.f-4);
 end
 
 epochs = ProgressBar(iter:n_epoch);
 for epoch in epochs
     global p
-    sample = rand(batch_size:ntotal)   # STEER paper
+    batch = rand(batch_size:ntotal)   # STEER paper
     loss = loss_neuralode(p)
     # grad = ForwardDiff.gradient(x -> loss_neuralode(x), p)
-    grad = Zygote.gradient(x -> loss_neuralode(x, sample), p)[1]
+    grad = Zygote.gradient(x -> loss_neuralode(x, batch), p)[1]
     grad_norm = norm(grad, 2)
     update!(opt, p, grad)
     set_description(epochs, string(@sprintf("Loss train %.2e gnorm %.1e lr %.1e", loss, grad_norm, opt[1].eta)))
